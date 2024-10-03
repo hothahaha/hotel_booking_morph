@@ -68,7 +68,7 @@ export default function RoomCard({
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomReviews, setSelectedRoomReviews] = useState<any[]>([]);
   const [isReviewsOpen, setIsReviewsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingRoomId, setLoadingRoomId] = useState<number | null>(null);
 
   const fetchRooms = useCallback(async () => {
     const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -91,7 +91,7 @@ export default function RoomCard({
     async (roomId: number, isAvailable: boolean) => {
       if (!account) return;
 
-      setIsLoading(true);
+      setLoadingRoomId(roomId);
       try {
         const provider = new ethers.BrowserProvider(window.ethereum as any);
         const signer = await provider.getSigner();
@@ -105,19 +105,19 @@ export default function RoomCard({
         await tx.wait();
 
         console.log(`房间 ${roomId} 的可用性已设置为 ${isAvailable}`);
-        fetchRooms(); // 刷新房间列表
+        fetchRooms();
       } catch (error: any) {
         console.error("设置房间可用性时出错:", error);
         alert(`设置房间可用性失败: ${error.message}`);
       } finally {
-        setIsLoading(false);
+        setLoadingRoomId(null);
       }
     },
     [account, fetchRooms]
   );
 
   const handleViewReviews = useCallback(async (roomId: number) => {
-    setIsLoading(true);
+    setLoadingRoomId(roomId);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(
@@ -133,7 +133,26 @@ export default function RoomCard({
       console.error("获取房间评价时出错:", error);
       alert(`无法获取房间评价: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      setLoadingRoomId(null);
+    }
+  }, []);
+
+  const checkRoomAvailability = useCallback(async (roomId: number) => {
+    setLoadingRoomId(roomId);
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const contract = new ethers.Contract(
+        bookingAddress,
+        bookingAbi,
+        provider
+      );
+      const isAvailable = await contract.isRoomAvailable(roomId);
+      alert(`房间 ${roomId} 当前状态: ${isAvailable ? "可用" : "不可用"}`);
+    } catch (error: any) {
+      console.error("检查房间可用性时出错:", error);
+      alert(`无法检查房间可用性: ${error.message}`);
+    } finally {
+      setLoadingRoomId(null);
     }
   }, []);
 
@@ -148,7 +167,8 @@ export default function RoomCard({
             onBookRoom={onBookRoom}
             handleSetAvailability={handleSetAvailability}
             handleViewReviews={handleViewReviews}
-            isLoading={isLoading}
+            checkRoomAvailability={checkRoomAvailability}
+            isLoading={loadingRoomId === room.id}
           />
         ))}
       </div>
@@ -170,6 +190,7 @@ interface RoomCardItemProps {
     isAvailable: boolean
   ) => Promise<void>;
   handleViewReviews: (roomId: number) => Promise<void>;
+  checkRoomAvailability: (roomId: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -179,6 +200,7 @@ function RoomCardItem({
   onBookRoom,
   handleSetAvailability,
   handleViewReviews,
+  checkRoomAvailability,
   isLoading,
 }: RoomCardItemProps) {
   const [isSettingAvailability, setIsSettingAvailability] = useState(false);
@@ -231,6 +253,7 @@ function RoomCardItem({
             handleSetAvailabilityWithLoading(isAvailable)
           }
           handleViewReviews={handleViewReviews}
+          checkRoomAvailability={checkRoomAvailability}
           isLoading={isLoading || isSettingAvailability}
         />
       </CardFooter>
@@ -247,6 +270,7 @@ interface RoomActionsProps {
     isAvailable: boolean
   ) => Promise<void>;
   handleViewReviews: (roomId: number) => Promise<void>;
+  checkRoomAvailability: (roomId: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -256,6 +280,7 @@ function RoomActions({
   onBookRoom,
   handleSetAvailability,
   handleViewReviews,
+  checkRoomAvailability,
   isLoading,
 }: RoomActionsProps) {
   return (
@@ -286,6 +311,12 @@ function RoomActions({
               className="hover:bg-gray-700"
             >
               查看评价
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => checkRoomAvailability(room.id)}
+              className="hover:bg-gray-700"
+            >
+              检查可用性
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

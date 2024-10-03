@@ -1,8 +1,10 @@
 export const bookingAbi = [
   {
-    type: "constructor",
-    inputs: [{ name: "_token", type: "address", internalType: "address" }],
-    stateMutability: "nonpayable",
+    type: "function",
+    name: "UPGRADE_INTERFACE_VERSION",
+    inputs: [],
+    outputs: [{ name: "", type: "string", internalType: "string" }],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -110,6 +112,25 @@ export const bookingAbi = [
   },
   {
     type: "function",
+    name: "getBookingsByRoomId",
+    inputs: [{ name: "roomId", type: "uint256", internalType: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        internalType: "struct HotelBooking.Booking[]",
+        components: [
+          { name: "guest", type: "address", internalType: "address" },
+          { name: "roomId", type: "uint256", internalType: "uint256" },
+          { name: "checkInDate", type: "uint256", internalType: "uint256" },
+          { name: "checkOutDate", type: "uint256", internalType: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "getRoomDetails",
     inputs: [{ name: "roomId", type: "uint256", internalType: "uint256" }],
     outputs: [
@@ -131,17 +152,38 @@ export const bookingAbi = [
   },
   {
     type: "function",
-    name: "i_owner",
+    name: "initialize",
+    inputs: [{ name: "_token", type: "address", internalType: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "isRoomAvailable",
+    inputs: [{ name: "roomId", type: "uint256", internalType: "uint256" }],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "owner",
     inputs: [],
     outputs: [{ name: "", type: "address", internalType: "address" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "i_token",
+    name: "proxiableUUID",
     inputs: [],
-    outputs: [{ name: "", type: "address", internalType: "contract IERC20" }],
+    outputs: [{ name: "", type: "bytes32", internalType: "bytes32" }],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "renounceOwnership",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -190,10 +232,68 @@ export const bookingAbi = [
   },
   {
     type: "function",
+    name: "token",
+    inputs: [],
+    outputs: [
+      { name: "", type: "address", internalType: "contract ERC20Upgradeable" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "transferOwnership",
+    inputs: [{ name: "newOwner", type: "address", internalType: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "upgradeToAndCall",
+    inputs: [
+      { name: "newImplementation", type: "address", internalType: "address" },
+      { name: "data", type: "bytes", internalType: "bytes" },
+    ],
+    outputs: [],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
     name: "withdrawTokens",
     inputs: [{ name: "amount", type: "uint256", internalType: "uint256" }],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "Initialized",
+    inputs: [
+      {
+        name: "version",
+        type: "uint64",
+        indexed: false,
+        internalType: "uint64",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "OwnershipTransferred",
+    inputs: [
+      {
+        name: "previousOwner",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "newOwner",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+    ],
+    anonymous: false,
   },
   {
     type: "event",
@@ -315,6 +415,33 @@ export const bookingAbi = [
     ],
     anonymous: false,
   },
+  {
+    type: "event",
+    name: "Upgraded",
+    inputs: [
+      {
+        name: "implementation",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "error",
+    name: "AddressEmptyCode",
+    inputs: [{ name: "target", type: "address", internalType: "address" }],
+  },
+  {
+    type: "error",
+    name: "ERC1967InvalidImplementation",
+    inputs: [
+      { name: "implementation", type: "address", internalType: "address" },
+    ],
+  },
+  { type: "error", name: "ERC1967NonPayable", inputs: [] },
+  { type: "error", name: "FailedInnerCall", inputs: [] },
   { type: "error", name: "HotelBooking__BookingTooShort", inputs: [] },
   {
     type: "error",
@@ -328,4 +455,22 @@ export const bookingAbi = [
   { type: "error", name: "HotelBooking__OnlyOwner", inputs: [] },
   { type: "error", name: "HotelBooking__RoomDoesNotExist", inputs: [] },
   { type: "error", name: "HotelBooking__TokenTransferFailed", inputs: [] },
+  { type: "error", name: "InvalidInitialization", inputs: [] },
+  { type: "error", name: "NotInitializing", inputs: [] },
+  {
+    type: "error",
+    name: "OwnableInvalidOwner",
+    inputs: [{ name: "owner", type: "address", internalType: "address" }],
+  },
+  {
+    type: "error",
+    name: "OwnableUnauthorizedAccount",
+    inputs: [{ name: "account", type: "address", internalType: "address" }],
+  },
+  { type: "error", name: "UUPSUnauthorizedCallContext", inputs: [] },
+  {
+    type: "error",
+    name: "UUPSUnsupportedProxiableUUID",
+    inputs: [{ name: "slot", type: "bytes32", internalType: "bytes32" }],
+  },
 ];

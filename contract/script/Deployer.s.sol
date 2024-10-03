@@ -11,7 +11,7 @@ contract DeployerScript is Script {
     function run() public returns (HotelBooking) {
         vm.startBroadcast();
         HotelToken token = new HotelToken();
-        HotelBooking hotelBooking = new HotelBooking(address(token));
+        HotelBooking hotelBooking = new HotelBooking();
 
         vm.stopBroadcast();
         return hotelBooking;

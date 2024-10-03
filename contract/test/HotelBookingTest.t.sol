@@ -3,23 +3,39 @@ pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {HotelBooking} from "../src/HotelBooking.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract BookingTest is Test {
     ERC20Mock mockToken;
+    HotelBooking bookingImplementation;
     HotelBooking booking;
     address owner = address(1);
     address guest1 = address(2);
     address guest2 = address(3);
 
-    function setUp() public {
-        // 部署 OpenZeppelin 的 MockERC20 代币
+    function setUp() public virtual {
+        // 部署 MockERC20 代币
         mockToken = new ERC20Mock();
         mockToken.mint(address(this), 1000 ether);
 
-        vm.prank(owner);
-        booking = new HotelBooking(address(mockToken));
+        // 部署实现合约
+        bookingImplementation = new HotelBooking();
+
+        // 部署代理合约
+        bytes memory data = abi.encodeWithSelector(
+            HotelBooking.initialize.selector,
+            address(mockToken)
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(bookingImplementation),
+            data
+        );
+        booking = HotelBooking(address(proxy));
+
+        // 转移所有权给 owner
+        vm.prank(address(this));
+        booking.transferOwnership(owner);
 
         // 为测试准备一些房间
         vm.startPrank(owner);
@@ -59,32 +75,6 @@ contract BookingTest is Test {
         assertEq(bookedCheckIn, checkInDate);
         assertEq(bookedCheckOut, checkOutDate);
         assertEq(category, "Presidential");
-
-        vm.stopPrank();
-    }
-
-    function testBookUnavailableRoom() public {
-        vm.startPrank(guest1);
-        mockToken.approve(address(booking), 4 ether);
-        // First booking should succeed
-        booking.bookRoomByCategory(
-            HotelBooking.RoomCategory.Presidential,
-            block.timestamp,
-            block.timestamp + 2 days
-        );
-
-        // Check room availability
-        console.log("After first booking - Room availability:");
-        (, , bool isAvailable, ) = booking.getRoomDetails(0);
-        console.log(isAvailable);
-
-        // Second booking should fail
-        vm.expectRevert(HotelBooking.HotelBooking__NoAvailableRoom.selector);
-        booking.bookRoomByCategory(
-            HotelBooking.RoomCategory.Presidential,
-            block.timestamp,
-            block.timestamp + 2 days
-        );
 
         vm.stopPrank();
     }
@@ -244,5 +234,66 @@ contract BookingTest is Test {
         );
 
         vm.stopPrank();
+    }
+
+    function testGetBookingsByRoomId() public {
+        vm.startPrank(guest1);
+        mockToken.approve(address(booking), 10 ether);
+
+        // 为同一个房间预订两次
+        uint256 checkInDate1 = block.timestamp;
+        uint256 checkOutDate1 = checkInDate1 + 2 days;
+        booking.bookRoomByCategory(
+            HotelBooking.RoomCategory.Presidential,
+            checkInDate1,
+            checkOutDate1
+        );
+
+        uint256 checkInDate2 = checkInDate1 + 7 days;
+        uint256 checkOutDate2 = checkInDate2 + 3 days;
+        booking.bookRoomByCategory(
+            HotelBooking.RoomCategory.Presidential,
+            checkInDate2,
+            checkOutDate2
+        );
+
+        vm.stopPrank();
+
+        // 获取房间的预订历史
+        HotelBooking.Booking[] memory roomBookings = booking
+            .getBookingsByRoomId(0);
+
+        // 验证预订历史
+        assertEq(roomBookings.length, 2, "Room should have 2 bookings");
+        assertEq(
+            roomBookings[0].guest,
+            guest1,
+            "First booking guest should be guest1"
+        );
+        assertEq(
+            roomBookings[0].checkInDate,
+            checkInDate1,
+            "First booking check-in date mismatch"
+        );
+        assertEq(
+            roomBookings[0].checkOutDate,
+            checkOutDate1,
+            "First booking check-out date mismatch"
+        );
+        assertEq(
+            roomBookings[1].guest,
+            guest1,
+            "Second booking guest should be guest1"
+        );
+        assertEq(
+            roomBookings[1].checkInDate,
+            checkInDate2,
+            "Second booking check-in date mismatch"
+        );
+        assertEq(
+            roomBookings[1].checkOutDate,
+            checkOutDate2,
+            "Second booking check-out date mismatch"
+        );
     }
 }

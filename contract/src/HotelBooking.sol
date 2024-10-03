@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract HotelBooking {
-    // State variables
-    address public immutable i_owner;
-    IERC20 public immutable i_token;
+contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    ERC20Upgradeable public token;
     uint256 public roomCount;
 
     // Enums
@@ -42,6 +43,9 @@ contract HotelBooking {
     mapping(uint256 => Room) public rooms;
     mapping(uint256 => Booking) public roomBookings;
 
+    // 新增：用于存储每个房间的所有预订
+    mapping(uint256 => Booking[]) private roomBookingsHistory;
+
     // Events
     event RoomAdded(uint256 roomId, string category, uint256 pricePerNight);
     event RoomBooked(
@@ -71,11 +75,6 @@ contract HotelBooking {
     error HotelBooking__InsufficientContractBalance();
 
     // Modifiers
-    modifier onlyOwner() {
-        if (msg.sender != i_owner) revert HotelBooking__OnlyOwner();
-        _;
-    }
-
     modifier roomExists(uint256 roomId) {
         if (roomId >= roomCount) revert HotelBooking__RoomDoesNotExist();
         _;
@@ -87,10 +86,19 @@ contract HotelBooking {
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address _token) {
-        i_owner = msg.sender;
-        i_token = IERC20(_token);
+    constructor() {
+        _disableInitializers();
     }
+
+    function initialize(address _token) public initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        token = ERC20Upgradeable(_token);
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     // External functions
     function addRoom(
@@ -129,19 +137,20 @@ contract HotelBooking {
         if (daysBooked == 0) revert HotelBooking__BookingTooShort();
 
         uint256 totalPrice = daysBooked * rooms[roomId].pricePerNight;
-        if (i_token.balanceOf(msg.sender) < totalPrice)
+        if (token.balanceOf(msg.sender) < totalPrice)
             revert HotelBooking__InsufficientTokenBalance();
 
-        roomBookings[roomId] = Booking({
+        Booking memory newBooking = Booking({
             guest: msg.sender,
             roomId: roomId,
             checkInDate: checkInDate,
             checkOutDate: checkOutDate
         });
 
-        rooms[roomId].isAvailable = false;
+        roomBookings[roomId] = newBooking;
+        roomBookingsHistory[roomId].push(newBooking);
 
-        if (!i_token.transferFrom(msg.sender, address(this), totalPrice))
+        if (!token.transferFrom(msg.sender, address(this), totalPrice))
             revert HotelBooking__TokenTransferFailed();
 
         emit RoomBooked(roomId, msg.sender, checkInDate, checkOutDate);
@@ -159,11 +168,11 @@ contract HotelBooking {
     }
 
     function withdrawTokens(uint256 amount) external onlyOwner {
-        if (i_token.balanceOf(address(this)) < amount)
+        if (token.balanceOf(address(this)) < amount)
             revert HotelBooking__InsufficientContractBalance();
-        if (!i_token.transfer(i_owner, amount))
+        if (!token.transfer(owner(), amount))
             revert HotelBooking__TokenTransferFailed();
-        emit TokensWithdrawn(i_owner, amount);
+        emit TokensWithdrawn(owner(), amount);
     }
 
     // Public view functions
@@ -240,6 +249,13 @@ contract HotelBooking {
         }
 
         return guestBookings;
+    }
+
+    // 新增：获取指定房间ID的所有预订
+    function getBookingsByRoomId(
+        uint256 roomId
+    ) public view returns (Booking[] memory) {
+        return roomBookingsHistory[roomId];
     }
 
     // Internal functions

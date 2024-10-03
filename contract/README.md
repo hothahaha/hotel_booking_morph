@@ -5,3 +5,7 @@
 ```shell
 $ make
 ```
+
+```shell
+$ yarn add --dev @openzeppelin/upgrades-core@1.39.0
+```
