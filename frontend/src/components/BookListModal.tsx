@@ -12,6 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { bookingAddress, bookingAbi, rpcUrl } from "@/constants";
+import { ListOrdered } from "lucide-react";
 
 interface Booking {
   guest: string;
@@ -59,7 +60,8 @@ export function BookListModal({ account }: BookListModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-white text-black hover:bg-gray-100 font-bold py-2 px-4 rounded">
+        <Button className="bg-white text-black hover:bg-gray-100 font-bold py-2 px-4 rounded flex items-center">
+          <ListOrdered className="mr-2 h-4 w-4" /> {/* 添加图标 */}
           查看订单列表
         </Button>
       </DialogTrigger>
@@ -75,7 +77,7 @@ export function BookListModal({ account }: BookListModalProps) {
             <p>暂无订单</p>
           ) : (
             <ul className="space-y-2">
-              {bookings.map((booking, index) => (
+              {bookings.map((booking: Booking, index: number) => (
                 <BookingItem key={index} booking={booking} />
               ))}
             </ul>

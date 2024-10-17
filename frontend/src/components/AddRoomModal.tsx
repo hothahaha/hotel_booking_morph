@@ -92,7 +92,9 @@ export default function AddRoomModal({
             type="number"
             placeholder="每晚价格 (ETH) *"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setPrice(e.target.value)
+            }
           />
           {error && <p className="text-red-500 text-sm">{error}</p>}
         </div>
