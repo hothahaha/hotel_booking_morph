@@ -1,4 +1,5 @@
 export const bookingAbi = [
+  { type: "constructor", inputs: [], stateMutability: "nonpayable" },
   {
     type: "function",
     name: "UPGRADE_INTERFACE_VERSION",
@@ -105,6 +106,7 @@ export const bookingAbi = [
           { name: "roomId", type: "uint256", internalType: "uint256" },
           { name: "checkInDate", type: "uint256", internalType: "uint256" },
           { name: "checkOutDate", type: "uint256", internalType: "uint256" },
+          { name: "totalPrice", type: "uint256", internalType: "uint256" },
         ],
       },
     ],
@@ -124,10 +126,24 @@ export const bookingAbi = [
           { name: "roomId", type: "uint256", internalType: "uint256" },
           { name: "checkInDate", type: "uint256", internalType: "uint256" },
           { name: "checkOutDate", type: "uint256", internalType: "uint256" },
+          { name: "totalPrice", type: "uint256", internalType: "uint256" },
         ],
       },
     ],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getCategoryString",
+    inputs: [
+      {
+        name: "category",
+        type: "uint8",
+        internalType: "enum HotelBooking.RoomCategory",
+      },
+    ],
+    outputs: [{ name: "", type: "string", internalType: "string" }],
+    stateMutability: "pure",
   },
   {
     type: "function",
@@ -159,13 +175,6 @@ export const bookingAbi = [
   },
   {
     type: "function",
-    name: "isRoomAvailable",
-    inputs: [{ name: "roomId", type: "uint256", internalType: "uint256" }],
-    outputs: [{ name: "", type: "bool", internalType: "bool" }],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
     name: "owner",
     inputs: [],
     outputs: [{ name: "", type: "address", internalType: "address" }],
@@ -194,6 +203,7 @@ export const bookingAbi = [
       { name: "roomId", type: "uint256", internalType: "uint256" },
       { name: "checkInDate", type: "uint256", internalType: "uint256" },
       { name: "checkOutDate", type: "uint256", internalType: "uint256" },
+      { name: "totalPrice", type: "uint256", internalType: "uint256" },
     ],
     stateMutability: "view",
   },
@@ -259,7 +269,7 @@ export const bookingAbi = [
   {
     type: "function",
     name: "withdrawTokens",
-    inputs: [{ name: "amount", type: "uint256", internalType: "uint256" }],
+    inputs: [],
     outputs: [],
     stateMutability: "nonpayable",
   },

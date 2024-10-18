@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAccount } from "wagmi";
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { bookingAddress, bookingAbi } from "@/constants";
+import { bookingAddress, bookingAbi, ownerAddress } from "@/constants";
 
 interface AddRoomModalProps {
   isOpen: boolean;
@@ -30,10 +31,18 @@ export default function AddRoomModal({
   onClose,
   onAddRoom,
 }: AddRoomModalProps) {
+  const { address, isConnected } = useAccount();
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const isOwner = address?.toLowerCase() === ownerAddress.toLowerCase();
 
   const handleAddRoom = async () => {
     if (!category || !price) {
@@ -51,6 +60,11 @@ export default function AddRoomModal({
       );
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(bookingAddress, bookingAbi, signer);
+
+      console.log("category:", category);
+      console.log(ethers.getBigInt(category));
+      console.log("price:", price);
+      console.log(ethers.parseEther(price));
 
       try {
         const tx = await contract.addRoom(
@@ -70,6 +84,10 @@ export default function AddRoomModal({
   };
 
   const isFormValid = category !== "" && price !== "";
+
+  if (!isClient) {
+    return <div>Loading add room modal...</div>; // 返回一个加载指示器而不是 null
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

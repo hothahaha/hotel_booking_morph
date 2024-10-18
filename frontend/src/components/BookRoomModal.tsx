@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription, // 新增
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   bookingAddress,
@@ -91,16 +91,16 @@ export function BookRoomModal({
         throw new Error("所选房间已不可用");
       }
 
-      // 检查用户余额
+      // 检查用户代币余额
       const balance = await tokenContract.balanceOf(account);
-      console.log("用户余额:", balance.toString());
+      console.log("用户代币余额:", ethers.formatEther(balance));
 
       // 计算总价
       const daysBooked = Math.ceil(
         (checkOutTimestamp - checkInTimestamp) / (24 * 60 * 60)
       );
       const totalPrice = BigInt(room.pricePerNight) * BigInt(daysBooked);
-      console.log("总价:", totalPrice.toString());
+      console.log("总价:", ethers.formatEther(totalPrice), "代币");
 
       if (balance < totalPrice) {
         throw new Error("代币余额不足");
@@ -108,7 +108,7 @@ export function BookRoomModal({
 
       // 检查授权
       const allowance = await tokenContract.allowance(account, bookingAddress);
-      console.log("当前授权:", allowance.toString());
+      console.log("当前授权:", ethers.formatEther(allowance));
       if (allowance < totalPrice) {
         console.log("正在请求授权...");
         const approveTx = await tokenContract.approve(

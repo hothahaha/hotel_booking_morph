@@ -19,6 +19,8 @@ update:; forge update
 
 build:; forge build
 
+deploy:; forge script script/DeployHotelBookingUUPS.s.sol --rpc-url $RPC_URL --broadcast --legacy  --private-key $PRIVATE_KEY
+
 test :; forge test 
 
 snapshot :; forge snapshot

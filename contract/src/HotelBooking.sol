@@ -37,6 +37,7 @@ contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 roomId;
         uint256 checkInDate;
         uint256 checkOutDate;
+        uint256 totalPrice;
     }
 
     // Mappings
@@ -131,7 +132,6 @@ contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             revert HotelBooking__InvalidBookingDates();
 
         uint256 roomId = _findAvailableRoomByCategory(category);
-        if (roomId == type(uint256).max) revert HotelBooking__NoAvailableRoom();
 
         uint256 daysBooked = (checkOutDate - checkInDate) / 1 days;
         if (daysBooked == 0) revert HotelBooking__BookingTooShort();
@@ -144,7 +144,8 @@ contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             guest: msg.sender,
             roomId: roomId,
             checkInDate: checkInDate,
-            checkOutDate: checkOutDate
+            checkOutDate: checkOutDate,
+            totalPrice: totalPrice
         });
 
         roomBookings[roomId] = newBooking;
@@ -167,12 +168,12 @@ contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         emit ReviewAdded(roomId, msg.sender, rating, comment);
     }
 
-    function withdrawTokens(uint256 amount) external onlyOwner {
-        if (token.balanceOf(address(this)) < amount)
-            revert HotelBooking__InsufficientContractBalance();
-        if (!token.transfer(owner(), amount))
+    function withdrawTokens() external onlyOwner {
+        uint256 balance = token.balanceOf(address(this));
+        if (balance <= 0) revert HotelBooking__InsufficientContractBalance();
+        if (!token.transfer(owner(), balance))
             revert HotelBooking__TokenTransferFailed();
-        emit TokensWithdrawn(owner(), amount);
+        emit TokensWithdrawn(owner(), balance);
     }
 
     // Public view functions
@@ -277,5 +278,12 @@ contract HotelBooking is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         if (category == RoomCategory.Deluxe) return "Deluxe";
         if (category == RoomCategory.Suite) return "Suite";
         return "";
+    }
+
+    // 在 HotelBooking 合约中添加以下函数
+    function getCategoryString(
+        RoomCategory category
+    ) public pure returns (string memory) {
+        return _getCategoryString(category);
     }
 }

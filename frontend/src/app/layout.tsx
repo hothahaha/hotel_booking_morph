@@ -6,11 +6,10 @@ import { WagmiProvider } from "wagmi";
 import { morphHolesky } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { walletConnectProjectId } from "@/constants";
 import "./globals.css";
 
-const projectId =
-  process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID ??
-  "c6c2b66315107469c40bd4497f2a69ea";
+const projectId = walletConnectProjectId ?? "";
 
 const walletConfig = getDefaultConfig({
   appName: "Hotel Booking DApp",

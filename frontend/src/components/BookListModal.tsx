@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ethers } from "ethers";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,21 +14,27 @@ import {
 import { bookingAddress, bookingAbi, rpcUrl } from "@/constants";
 import { ListOrdered } from "lucide-react";
 
-interface Booking {
-  guest: string;
-  roomId: number;
-  checkInDate: number;
-  checkOutDate: number;
-}
-
 interface BookListModalProps {
   account: string | null;
+  isConnected: boolean;
 }
 
-export function BookListModal({ account }: BookListModalProps) {
+interface Booking {
+  roomId: bigint;
+  checkInDate: bigint;
+  checkOutDate: bigint;
+  totalPrice: bigint;
+}
+
+export function BookListModal({ account, isConnected }: BookListModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const fetchBookings = useCallback(async () => {
     if (!account) return;
@@ -60,8 +66,14 @@ export function BookListModal({ account }: BookListModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-white text-black hover:bg-gray-100 font-bold py-2 px-4 rounded flex items-center">
-          <ListOrdered className="mr-2 h-4 w-4" /> {/* 添加图标 */}
+        <Button
+          className={`
+            bg-white text-black hover:bg-gray-100 font-bold py-2 px-4 rounded flex items-center
+            ${isClient && !isConnected ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+          disabled={isClient ? !isConnected : undefined}
+        >
+          <ListOrdered className="mr-2 h-4 w-4" />
           查看订单列表
         </Button>
       </DialogTrigger>
@@ -88,22 +100,19 @@ export function BookListModal({ account }: BookListModalProps) {
   );
 }
 
-interface BookingItemProps {
-  booking: Booking;
-}
-
-function BookingItem({ booking }: BookingItemProps) {
+function BookingItem({ booking }: { booking: Booking }) {
   return (
-    <li className="border p-2 rounded">
+    <li className="border border-gray-700 rounded p-2">
       <p>房间 ID: {booking.roomId.toString()}</p>
       <p>
         入住日期:{" "}
         {new Date(Number(booking.checkInDate) * 1000).toLocaleDateString()}
       </p>
       <p>
-        离开日期:{" "}
+        退房日期:{" "}
         {new Date(Number(booking.checkOutDate) * 1000).toLocaleDateString()}
       </p>
+      <p>总价: {ethers.formatEther(booking.totalPrice)}</p>
     </li>
   );
 }

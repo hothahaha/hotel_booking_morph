@@ -43,8 +43,10 @@ export function ReviewModal({
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(bookingAddress, bookingAbi, signer);
 
+      console.log("Submitting review:", { roomId, rating, comment });
       const tx = await contract.addReview(roomId, rating, comment);
       await tx.wait();
+      console.log("Review submitted successfully");
 
       setIsOpen(false);
       onReviewComplete();

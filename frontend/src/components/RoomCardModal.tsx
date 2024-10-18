@@ -16,18 +16,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import Image from "next/image";
-import { bookingAddress, bookingAbi, rpcUrl } from "@/constants";
+import { bookingAddress, bookingAbi, rpcUrl, ownerAddress } from "@/constants";
 import { BookRoomModal } from "./BookRoomModal";
 import { ReviewModal } from "./ReviewModal";
 import { MoreVertical, Loader2 } from "lucide-react";
+import { ReviewsDialog } from "./ReviewsDialog";
 
 interface Room {
   id: number;
@@ -40,6 +34,7 @@ interface RoomCardProps {
   account: string | null;
   onBookRoom: (roomId: number) => Promise<void>;
   refreshTrigger: number;
+  rooms: Room[]; // 新增
 }
 
 const getCategoryImage = (category: string | number): string => {
@@ -64,34 +59,25 @@ export default function RoomCard({
   account,
   onBookRoom,
   refreshTrigger,
+  rooms,
 }: RoomCardProps) {
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomReviews, setSelectedRoomReviews] = useState<any[]>([]);
   const [isReviewsOpen, setIsReviewsOpen] = useState(false);
-  const [loadingRoomId, setLoadingRoomId] = useState<number | null>(null);
-
-  const fetchRooms = useCallback(async () => {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const contract = new ethers.Contract(bookingAddress, bookingAbi, provider);
-
-    try {
-      const roomsData = await contract.getAllRooms();
-      console.log("获取的房间数据:", roomsData);
-      setRooms(roomsData);
-    } catch (error) {
-      console.error("获取房间时出错:", error);
-    }
-  }, []);
+  const [loadingRoomIds, setLoadingRoomIds] = useState<number[]>([]);
+  const [isClient, setIsClient] = useState(false);
+  const [provider, setProvider] = useState<ethers.JsonRpcProvider | null>(null);
 
   useEffect(() => {
-    fetchRooms();
-  }, [fetchRooms, refreshTrigger]);
+    setIsClient(true);
+  }, []);
+
+  const isOwner = account?.toLowerCase() === ownerAddress.toLowerCase();
 
   const handleSetAvailability = useCallback(
     async (roomId: number, isAvailable: boolean) => {
       if (!account) return;
 
-      setLoadingRoomId(roomId);
+      setLoadingRoomIds((prev) => [...prev, roomId]);
       try {
         const provider = new ethers.BrowserProvider(window.ethereum as any);
         const signer = await provider.getSigner();
@@ -105,19 +91,19 @@ export default function RoomCard({
         await tx.wait();
 
         console.log(`房间 ${roomId} 的可用性已设置为 ${isAvailable}`);
-        fetchRooms();
+        onBookRoom(roomId); // 刷新房间状态
       } catch (error: any) {
         console.error("设置房间可用性时出错:", error);
         alert(`设置房间可用性失败: ${error.message}`);
       } finally {
-        setLoadingRoomId(null);
+        setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
       }
     },
-    [account, fetchRooms]
+    [account, onBookRoom]
   );
 
   const handleViewReviews = useCallback(async (roomId: number) => {
-    setLoadingRoomId(roomId);
+    setLoadingRoomIds((prev) => [...prev, roomId]);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(
@@ -127,18 +113,19 @@ export default function RoomCard({
       );
 
       const roomDetails = await contract.getRoomDetails(roomId);
+
       setSelectedRoomReviews(roomDetails.reviews);
       setIsReviewsOpen(true);
     } catch (error: any) {
       console.error("获取房间评价时出错:", error);
       alert(`无法获取房间评价: ${error.message}`);
     } finally {
-      setLoadingRoomId(null);
+      setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
     }
   }, []);
 
   const checkRoomAvailability = useCallback(async (roomId: number) => {
-    setLoadingRoomId(roomId);
+    setLoadingRoomIds((prev) => [...prev, roomId]);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(
@@ -146,30 +133,142 @@ export default function RoomCard({
         bookingAbi,
         provider
       );
-      const isAvailable = await contract.isRoomAvailable(roomId);
-      alert(`房间 ${roomId} 当前状态: ${isAvailable ? "可用" : "不可用"}`);
+      const roomDetails = await contract.getRoomDetails(roomId);
+      alert(
+        `房间 ${roomId} 当前状态: ${
+          roomDetails.isAvailable ? "可用" : "不可用"
+        }`
+      );
     } catch (error: any) {
       console.error("检查房间可用性时出错:", error);
       alert(`无法检查房间可用性: ${error.message}`);
     } finally {
-      setLoadingRoomId(null);
+      setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
     }
   }, []);
 
+  useEffect(() => {
+    const initProvider = async () => {
+      try {
+        const newProvider = new ethers.JsonRpcProvider(rpcUrl);
+        await newProvider.getNetwork(); // 测试连接
+        setProvider(newProvider);
+      } catch (error) {
+        console.error("Failed to initialize provider:", error);
+        // 可以在这里添加重试逻辑或显示错误消息
+      }
+    };
+
+    initProvider();
+  }, []);
+
+  const fetchRoomDetails = useCallback(
+    async (roomId: number) => {
+      if (!provider) return;
+
+      setLoadingRoomIds((prev) => [...prev, roomId]);
+      try {
+        const contract = new ethers.Contract(
+          bookingAddress,
+          bookingAbi,
+          provider
+        );
+        const roomDetails = await contract.getRoomDetails(roomId);
+        // 处理房间详情...
+      } catch (error) {
+        console.error("Error fetching room details:", error);
+        // 显示错误消息给用户
+      } finally {
+        setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
+      }
+    },
+    [provider]
+  );
+
+  const handleReview = useCallback(async (roomId: number) => {
+    setLoadingRoomIds((prev) => [...prev, roomId]);
+    try {
+      // 这里我们只是触发 ReviewModal 的打开
+      // 实际的评价提交逻辑会在 ReviewModal 组件中处理
+      console.log(`准备评价房间 ${roomId}`);
+    } catch (error: any) {
+      console.error("准备评价时出错:", error);
+      alert(`准备评价失败: ${error.message}`);
+    } finally {
+      setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
+    }
+  }, []);
+
+  const handleReviewComplete = useCallback(
+    async (roomId: number) => {
+      setLoadingRoomIds((prev) => [...prev, roomId]);
+      try {
+        await onBookRoom(roomId); // 刷新房间状态
+      } catch (error) {
+        console.error("刷新房间状态时出错:", error);
+      } finally {
+        setLoadingRoomIds((prev) => prev.filter((id) => id !== roomId));
+      }
+    },
+    [onBookRoom]
+  );
+
+  if (!isClient) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {rooms.map((room) => (
-          <RoomCardItem
+          <Card
             key={room.id}
-            room={room}
-            account={account}
-            onBookRoom={onBookRoom}
-            handleSetAvailability={handleSetAvailability}
-            handleViewReviews={handleViewReviews}
-            checkRoomAvailability={checkRoomAvailability}
-            isLoading={loadingRoomId === room.id}
-          />
+            className="bg-gray-800 border-gray-700 overflow-hidden flex flex-col relative"
+          >
+            {loadingRoomIds.includes(room.id) && (
+              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+            )}
+            <div className="relative w-full h-64">
+              <Image
+                src={getCategoryImage(room.category)}
+                alt={`${getCategoryString(room.category)} 图片`}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                style={{ objectFit: "cover" }}
+                priority
+              />
+            </div>
+            <CardHeader>
+              <CardTitle className="text-white text-xl">
+                {getCategoryString(room.category)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-white text-lg">
+                价格: {ethers.formatEther(room.pricePerNight)} ETH
+              </p>
+              <p className="text-white text-lg">
+                状态: {room.isAvailable ? "可预订" : "已预订"}
+              </p>
+            </CardContent>
+            <CardFooter className="flex justify-between items-center">
+              <RoomActions
+                room={room}
+                account={account}
+                onBookRoom={onBookRoom}
+                handleSetAvailability={handleSetAvailability}
+                handleViewReviews={handleViewReviews}
+                checkRoomAvailability={checkRoomAvailability}
+                handleReview={handleReview}
+                handleReviewComplete={handleReviewComplete}
+                isLoading={loadingRoomIds.includes(room.id)}
+                isOwner={isOwner}
+                isClient={isClient}
+              />
+            </CardFooter>
+          </Card>
         ))}
       </div>
       <ReviewsDialog
@@ -178,86 +277,6 @@ export default function RoomCard({
         reviews={selectedRoomReviews}
       />
     </>
-  );
-}
-
-interface RoomCardItemProps {
-  room: Room;
-  account: string | null;
-  onBookRoom: (roomId: number) => Promise<void>;
-  handleSetAvailability: (
-    roomId: number,
-    isAvailable: boolean
-  ) => Promise<void>;
-  handleViewReviews: (roomId: number) => Promise<void>;
-  checkRoomAvailability: (roomId: number) => Promise<void>;
-  isLoading: boolean;
-}
-
-function RoomCardItem({
-  room,
-  account,
-  onBookRoom,
-  handleSetAvailability,
-  handleViewReviews,
-  checkRoomAvailability,
-  isLoading,
-}: RoomCardItemProps) {
-  const [isSettingAvailability, setIsSettingAvailability] = useState(false);
-
-  const handleSetAvailabilityWithLoading = async (isAvailable: boolean) => {
-    setIsSettingAvailability(true);
-    try {
-      await handleSetAvailability(room.id, isAvailable);
-    } finally {
-      setIsSettingAvailability(false);
-    }
-  };
-
-  return (
-    <Card className="bg-gray-800 border-gray-700 overflow-hidden flex flex-col relative">
-      {isSettingAvailability && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-white" />
-        </div>
-      )}
-      <div className="relative w-full h-64">
-        <Image
-          src={getCategoryImage(room.category)}
-          alt={`${getCategoryString(room.category)} 图片`}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          style={{ objectFit: "cover" }}
-          priority
-        />
-      </div>
-      <CardHeader>
-        <CardTitle className="text-white text-xl">
-          {getCategoryString(room.category)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-white text-lg">
-          价格: {ethers.formatEther(room.pricePerNight)} ETH
-        </p>
-        <p className="text-white text-lg">
-          状态: {room.isAvailable ? "可预订" : "已预订"}
-        </p>
-      </CardContent>
-      <CardFooter className="flex justify-between items-center">
-        <RoomActions
-          room={room}
-          account={account}
-          onBookRoom={onBookRoom}
-          handleSetAvailability={(roomId: number, isAvailable: boolean) =>
-            handleSetAvailabilityWithLoading(isAvailable)
-          }
-          handleViewReviews={handleViewReviews}
-          checkRoomAvailability={checkRoomAvailability}
-          isLoading={isLoading || isSettingAvailability}
-        />
-      </CardFooter>
-    </Card>
   );
 }
 
@@ -271,7 +290,11 @@ interface RoomActionsProps {
   ) => Promise<void>;
   handleViewReviews: (roomId: number) => Promise<void>;
   checkRoomAvailability: (roomId: number) => Promise<void>;
+  handleReview: (roomId: number) => Promise<void>;
+  handleReviewComplete: (roomId: number) => Promise<void>;
   isLoading: boolean;
+  isOwner: boolean;
+  isClient: boolean;
 }
 
 function RoomActions({
@@ -281,11 +304,21 @@ function RoomActions({
   handleSetAvailability,
   handleViewReviews,
   checkRoomAvailability,
+  handleReview,
+  handleReviewComplete,
   isLoading,
+  isOwner,
+  isClient,
 }: RoomActionsProps) {
+  if (!isClient) {
+    return <div>Loading actions...</div>;
+  }
+
+  const isConnected = isClient && account !== null;
+
   return (
-    <>
-      <div className="flex space-x-2">
+    <div className="flex justify-between items-center w-full">
+      {isConnected && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -297,39 +330,40 @@ function RoomActions({
             className="bg-gray-800 text-white border-gray-700"
           >
             <DropdownMenuItem
-              onClick={() => handleSetAvailability(room.id, !room.isAvailable)}
+              onClick={() => handleViewReviews(room.id)}
               className="hover:bg-gray-700"
               disabled={isLoading}
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              设置{room.isAvailable ? "已预订" : "空闲"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleViewReviews(room.id)}
-              className="hover:bg-gray-700"
-            >
               查看评价
             </DropdownMenuItem>
+            {isOwner && (
+              <DropdownMenuItem
+                onClick={() =>
+                  handleSetAvailability(room.id, !room.isAvailable)
+                }
+                className="hover:bg-gray-700"
+                disabled={isLoading}
+              >
+                设置{room.isAvailable ? "已预订" : "空闲"}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={() => checkRoomAvailability(room.id)}
               className="hover:bg-gray-700"
+              disabled={isLoading}
             >
               检查可用性
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      )}
       <div className="flex space-x-2">
-        {!room.isAvailable && (
-          <ReviewModal
-            roomId={room.id}
-            account={account}
-            onReviewComplete={() => onBookRoom(room.id)}
-          />
-        )}
-        {room.isAvailable ? (
+        <ReviewModal
+          roomId={room.id}
+          account={account}
+          onReviewComplete={() => handleReviewComplete(room.id)}
+        />
+        {isConnected && room.isAvailable ? (
           <BookRoomModal
             roomCategory={Number(room.category)}
             account={account}
@@ -341,47 +375,10 @@ function RoomActions({
             disabled
             className="bg-gray-600 text-gray-400 cursor-not-allowed"
           >
-            已预订
+            {isConnected ? "已预订" : "请连接钱包"}
           </Button>
         )}
       </div>
-    </>
-  );
-}
-
-interface ReviewsDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  reviews: any[];
-}
-
-function ReviewsDialog({ isOpen, onOpenChange, reviews }: ReviewsDialogProps) {
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-gray-800 text-white">
-        <DialogHeader>
-          <DialogTitle>房间评价</DialogTitle>
-          <DialogDescription>查看该房间的所有评价。</DialogDescription>
-        </DialogHeader>
-        <div className="py-4">
-          {reviews.length === 0 ? (
-            <p>暂无评价</p>
-          ) : (
-            <ul className="space-y-2">
-              {reviews.map((review, index) => (
-                <li key={index} className="border p-2 rounded">
-                  <p>评分: {review.rating.toString()} / 5</p>
-                  <p>评论: {review.comment}</p>
-                  <p>
-                    评价者: {review.guest.slice(0, 6)}...
-                    {review.guest.slice(-4)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
